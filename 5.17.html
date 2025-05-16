@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>MindAR 名片互動示範</title>
+
+    <!-- 引入 A-Frame 與 MindAR -->
+    <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <a-scene
+      mindar-image="imageTargetSrc: targets.mind; autoStart: true; uiLoading: true; uiError: true; uiScanning: true;"
+      color-space="sRGB"
+      renderer="colorManagement: true; physicallyCorrectLights: true"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: false"
+    >
+      <a-assets>
+        <img id="resultImg" src="card1.jpg" />
+      </a-assets>
+
+      <a-light type="ambient" intensity="3"></a-light>
+      <a-camera look-controls="enabled: false"></a-camera>
+
+      <a-entity mindar-image-target="targetIndex: 0">
+        <a-plane
+          src="#resultImg"
+          width="1.2"
+          height="0.7"
+          position="0 0 0"
+          touch-transform
+        ></a-plane>
+      </a-entity>
+    </a-scene>
+
+    <script>
+      AFRAME.registerComponent("touch-transform", {
+        init: function () {
+          const el = this.el;
+          const canvas = el.sceneEl.canvas;
+
+          this.defaultScale = el.object3D.scale.x;
+          this.currentScale = this.defaultScale;
+          this.prevDistance = null;
+          this.prevAngle = null;
+          this.lastTap = 0;
+          this.isPinching = false;
+
+          // 雙擊重設大小與旋轉
+          el.addEventListener("click", () => {
+            const now = Date.now();
+            if (now - this.lastTap < 300) {
+              el.object3D.scale.set(
+                this.defaultScale,
+                this.defaultScale,
+                this.defaultScale
+              );
+              el.object3D.rotation.set(0, 0, 0);
+              this.currentScale = this.defaultScale;
+            }
+            this.lastTap = now;
+          });
+
+          // 兩指觸控開始
+          canvas.addEventListener("touchstart", (e) => {
+            if (e.touches.length === 2) {
+              this.isPinching = true;
+              const dx = e.touches[0].clientX - e.touches[1].clientX;
+              const dy = e.touches[0].clientY - e.touches[1].clientY;
+              this.prevDistance = Math.hypot(dx, dy);
+              this.prevAngle = Math.atan2(dy, dx);
+            }
+          });
+
+          // 移動手勢
+          canvas.addEventListener("touchmove", (e) => {
+            if (this.isPinching && e.touches.length === 2) {
+              const dx = e.touches[0].clientX - e.touches[1].clientX;
+              const dy = e.touches[0].clientY - e.touches[1].clientY;
+              const dist = Math.hypot(dx, dy);
+              const angle = Math.atan2(dy, dx);
+
+              const scaleFactor = dist / this.prevDistance;
+              this.currentScale *= scaleFactor;
+              this.currentScale = Math.min(
+                Math.max(this.currentScale, 0.5),
+                3
+              );
+              el.object3D.scale.set(
+                this.currentScale,
+                this.currentScale,
+                this.currentScale
+              );
+
+              const deltaAngle = angle - this.prevAngle;
+              const rot = el.object3D.rotation;
+              el.object3D.rotation.set(rot.x, rot.y, rot.z + deltaAngle);
+
+              this.prevDistance = dist;
+              this.prevAngle = angle;
+
+              e.preventDefault();
+            }
+          });
+
+          // 結束觸控
+          canvas.addEventListener("touchend", (e) => {
+            if (e.touches.length < 2) {
+              this.isPinching = false;
+              this.prevDistance = null;
+              this.prevAngle = null;
+            }
+          });
+        },
+      });
+    </script>
+  </body>
+</html>
